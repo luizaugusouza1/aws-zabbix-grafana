@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: us-east-1 | VPC + 2 públicas + 2 privadas + IGW + RTs + SG + EC2 (Ubuntu 22.04) Zabbix + Grafana
+Description: us-east-1 | VPC + 2 públicas + 2 privadas + IGW + RTs + SG + EC2 (Ubuntu 22.04)
 
 Parameters:
   VPCCidr:
@@ -20,7 +20,9 @@ Parameters:
 
   AmiId:
     Type: AWS::EC2::Image::Id
+    # Ubuntu 22.04 (us-east-1) - ajuste se necessário
     Default: ami-0c5ddb3560e768732
+
   InstanceType:
     Type: String
     Default: t3.large
@@ -29,10 +31,12 @@ Parameters:
       - t3.small
       - t3.medium
       - t3.large
+
   RootVolumeSizeGiB:
     Type: Number
-    Default: 30
+    Default: 50
     MinValue: 8
+
   IngressCidr:
     Type: String
     Default: 0.0.0.0/0
@@ -41,36 +45,8 @@ Parameters:
     Type: AWS::EC2::KeyPair::KeyName
     Default: LinuxUbuntu
 
-  # App/DB
-  DbName:
-    Type: String
-    Default: dbzabbix
-  DbUser:
-    Type: String
-    Default: userzabbix
-  DbPass:
-    Type: String
-    NoEcho: true
-    Default: pswzabbix@25
-  RootDbPass:
-    Type: String
-    NoEcho: true
-    Default: LA@2025Br55
-  NginxPort:
-    Type: String
-    Default: '80'
-  ServerName:
-    Type: String
-    Default: _
-
-  # Grafana
-  GrafanaAdminPass:
-    Type: String
-    NoEcho: true
-    Default: Admin@2025!
-
 Resources:
-  # VPC e Internet
+  # ----------------- VPC e Internet -----------------
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -79,14 +55,14 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: vpc-Zabbix-Grafana
+          Value: vpc-base
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: ig-Zabbix-Grafana
+          Value: igw-base
 
   VPCGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -94,67 +70,59 @@ Resources:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
-  # Subnets
+  # ----------------- Sub-redes -----------------
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Ref PublicSubnet1Cidr
-      AvailabilityZone: !Select
-        - 0
-        - !GetAZs ''
+      AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: sp1-Zabbix-Grafana
+          Value: public-az1
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Ref PublicSubnet2Cidr
-      AvailabilityZone: !Select
-        - 1
-        - !GetAZs ''
+      AvailabilityZone: !Select [1, !GetAZs '']
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: sp2-Zabbix-Grafana
+          Value: public-az2
 
   PrivateSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Ref PrivateSubnet1Cidr
-      AvailabilityZone: !Select
-        - 0
-        - !GetAZs ''
+      AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: spriv1-Zabbix-Grafana
+          Value: private-az1
 
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Ref PrivateSubnet2Cidr
-      AvailabilityZone: !Select
-        - 1
-        - !GetAZs ''
+      AvailabilityZone: !Select [1, !GetAZs '']
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: spriv2-Zabbix-Grafana
+          Value: private-az2
 
-  # Route tables
+  # ----------------- Tabelas de rota -----------------
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: PRT-Zabbix-Grafana
+          Value: rtb-public
 
   PublicDefaultRoute:
     Type: AWS::EC2::Route
@@ -182,7 +150,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: PVT-Zabbix-Grafana
+          Value: rtb-private
 
   AssocPrivateRt1:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -196,17 +164,17 @@ Resources:
       SubnetId: !Ref PrivateSubnet2
       RouteTableId: !Ref PrivateRouteTable
 
-  # Security Group
+  # ----------------- Security Group -----------------
   AppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: SSH/HTTP/HTTPS/Zabbix/Grafana
+      GroupDescription: SSH/HTTP/HTTPS
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 189.18.217.85/32  # meu IP fixo
+          CidrIp: 187.58.48.3/32
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -216,37 +184,14 @@ Resources:
           ToPort: 443
           CidrIp: !Ref IngressCidr
         - IpProtocol: tcp
-          FromPort: 10050
-          ToPort: 10050
-          CidrIp: !Ref IngressCidr
-        - IpProtocol: tcp
-          FromPort: 10051
-          ToPort: 10051
-          CidrIp: !Ref IngressCidr
-        - IpProtocol: tcp
           FromPort: 3000
           ToPort: 3000
           CidrIp: !Ref IngressCidr
       Tags:
         - Key: Name
-          Value: SG-zabbix-grafana
+          Value: sg-ec2
 
-  # Elastic IP (IP fixo) + Associação
-  ElasticIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-      Tags:
-        - Key: Name
-          Value: eip-zabbix-grafana
-
-  EIPAssociation:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      AllocationId: !GetAtt ElasticIP.AllocationId
-      InstanceId: !Ref Ec2Instance
-
-  # EC2
+  # ----------------- EC2 -----------------
   Ec2Instance:
     Type: AWS::EC2::Instance
     Properties:
@@ -254,8 +199,7 @@ Resources:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       SubnetId: !Ref PublicSubnet1
-      SecurityGroupIds:
-        - !Ref AppSecurityGroup
+      SecurityGroupIds: [!Ref AppSecurityGroup]
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -264,7 +208,21 @@ Resources:
             DeleteOnTermination: true
       Tags:
         - Key: Name
-          Value: instancia-Zabbix-Grafana
+          Value: InstanceLinuxUbuntu22
+
+  Ec2Eip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: InstanceLinuxUbuntu22-EIP
+
+  Ec2EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref Ec2Instance
+      AllocationId: !GetAtt Ec2Eip.AllocationId
 
 Outputs:
   VpcId:
@@ -298,8 +256,5 @@ Outputs:
     Description: DNS público da EC2
     Value: !GetAtt Ec2Instance.PublicDnsName
   InstancePublicIp:
-    Description: IP público da EC2
-    Value: !GetAtt Ec2Instance.PublicIp
-  ElasticIpAddress:
-    Description: Elastic IP associado à instância
-    Value: !Ref ElasticIP
+    Description: IP público (EIP) da EC2
+    Value: !Ref Ec2Eip
