@@ -237,8 +237,8 @@ Resources:
     Properties:
       Domain: vpc
       Tags:
-      - Key: Name
-        Value: eip-zabbix-grafana
+        - Key: Name
+          Value: eip-zabbix-grafana
 
   EIPAssociation:
     Type: AWS::EC2::EIPAssociation
@@ -264,116 +264,117 @@ Resources:
             DeleteOnTermination: true
       Tags:
         - Key: Name
-          Value: Instancia-Zabbix-Grafana
-      UserData: !Base64
-        Fn::Sub: |
-          #!/bin/bash
-          set -euo pipefail
-          export DEBIAN_FRONTEND=noninteractive
+          Value: instancia-Zabbix-Grafana
+      UserData:
+        Fn::Base64:
+          Fn::Sub: |
+            #!/bin/bash
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
 
-          # Parâmetros vindos do CloudFormation
-          DB_NAME='${DbName}'
-          DB_USER='${DbUser}'
-          DB_PASS='${DbPass}'
-          ROOT_PASS='${RootDbPass}'
-          NGINX_PORT='${NginxPort}'
-          SERVER_NAME='${ServerName}'
-          GRAFANA_PASS='${GrafanaAdminPass}'
+            # Parâmetros vindos do CloudFormation
+            DB_NAME='${DbName}'
+            DB_USER='${DbUser}'
+            DB_PASS='${DbPass}'
+            ROOT_PASS='${RootDbPass}'
+            NGINX_PORT='${NginxPort}'
+            SERVER_NAME='${ServerName}'
+            GRAFANA_PASS='${GrafanaAdminPass}'
 
-          # ---------- Base ----------
-          apt-get update -y
-          apt-get install -y wget curl gnupg lsb-release gpg
+            # ---------- Base ----------
+            apt-get update -y
+            apt-get install -y wget curl gnupg lsb-release gpg
 
-          # ---------- MariaDB ----------
-          apt-get install -y mariadb-server
-          systemctl enable mariadb
-          systemctl start mariadb
-          mysql -u root <<SQL || true
-          ALTER USER 'root'@'localhost' IDENTIFIED BY '${RootDbPass}';
-          FLUSH PRIVILEGES;
-          SQL
-          mysql --protocol=socket -u root <<SQL || true
-          ALTER USER 'root'@'localhost' IDENTIFIED BY '${RootDbPass}';
-          FLUSH PRIVILEGES;
-          SQL
-          mysql -uroot -p'${RootDbPass}' -e "SELECT VERSION();" >/dev/null
+            # ---------- MariaDB ----------
+            apt-get install -y mariadb-server
+            systemctl enable mariadb
+            systemctl start mariadb
+            mysql -u root <<SQL || true
+            ALTER USER 'root'@'localhost' IDENTIFIED BY '${RootDbPass}';
+            FLUSH PRIVILEGES;
+            SQL
+            mysql --protocol=socket -u root <<SQL || true
+            ALTER USER 'root'@'localhost' IDENTIFIED BY '${RootDbPass}';
+            FLUSH PRIVILEGES;
+            SQL
+            mysql -uroot -p'${RootDbPass}' -e "SELECT VERSION();" >/dev/null
 
-          # ---------- Zabbix 7.4 ----------
-          cd /tmp
-          wget -q https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.4+ubuntu22.04_all.deb
-          dpkg -i zabbix-release_latest_7.4+ubuntu22.04_all.deb
-          apt-get update -y
-          apt-get install -y zabbix-server-mysql zabbix-frontend-php zabbix-nginx-conf zabbix-sql-scripts zabbix-agent php8.1-fpm nginx
+            # ---------- Zabbix 7.4 ----------
+            cd /tmp
+            wget -q https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.4+ubuntu22.04_all.deb
+            dpkg -i zabbix-release_latest_7.4+ubuntu22.04_all.deb
+            apt-get update -y
+            apt-get install -y zabbix-server-mysql zabbix-frontend-php zabbix-nginx-conf zabbix-sql-scripts zabbix-agent php8.1-fpm nginx
 
-          mysql -u root -p'${RootDbPass}' <<SQL
-          CREATE DATABASE IF NOT EXISTS ${DbName} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-          CREATE USER IF NOT EXISTS '${DbUser}'@'localhost' IDENTIFIED BY '${DbPass}';
-          GRANT ALL PRIVILEGES ON ${DbName}.* TO '${DbUser}'@'localhost';
-          SET GLOBAL log_bin_trust_function_creators = 1;
-          FLUSH PRIVILEGES;
-          SQL
+            mysql -u root -p'${RootDbPass}' <<SQL
+            CREATE DATABASE IF NOT EXISTS ${DbName} CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+            CREATE USER IF NOT EXISTS '${DbUser}'@'localhost' IDENTIFIED BY '${DbPass}';
+            GRANT ALL PRIVILEGES ON ${DbName}.* TO '${DbUser}'@'localhost';
+            SET GLOBAL log_bin_trust_function_creators = 1;
+            FLUSH PRIVILEGES;
+            SQL
 
-          zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz \
-            | mysql --default-character-set=utf8mb4 -u'${DbUser}' -p'${DbPass}' '${DbName}'
+            zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz \
+              | mysql --default-character-set=utf8mb4 -u'${DbUser}' -p'${DbPass}' '${DbName}'
 
-          mysql -u root -p'${RootDbPass}' -e "SET GLOBAL log_bin_trust_function_creators = 0;"
+            mysql -u root -p'${RootDbPass}' -e "SET GLOBAL log_bin_trust_function_creators = 0;"
 
-          # Config zabbix_server.conf idempotente
-          awk -v OFS="=" '!/^[[:space:]]*#?[[:space:]]*DB(Host|Name|User|Password)=/ {print}' \
-            /etc/zabbix/zabbix_server.conf > /etc/zabbix/zabbix_server.conf.clean && \
-            mv /etc/zabbix/zabbix_server.conf.clean /etc/zabbix/zabbix_server.conf
-          cat >> /etc/zabbix/zabbix_server.conf <<EOF
-          DBHost=localhost
-          DBName=${DbName}
-          DBUser=${DbUser}
-          DBPassword=${DbPass}
-          EOF
+            # Config zabbix_server.conf idempotente
+            awk -v OFS="=" '!/^[[:space:]]*#?[[:space:]]*DB(Host|Name|User|Password)=/ {print}' \
+              /etc/zabbix/zabbix_server.conf > /etc/zabbix/zabbix_server.conf.clean && \
+              mv /etc/zabbix/zabbix_server.conf.clean /etc/zabbix/zabbix_server.conf
+            cat >> /etc/zabbix/zabbix_server.conf <<EOF
+            DBHost=localhost
+            DBName=${DbName}
+            DBUser=${DbUser}
+            DBPassword=${DbPass}
+            EOF
 
-          # Nginx/Zabbix site
-          sed -i "s|^\\s*#\\s*listen\\s\\+80;|        listen ${NginxPort};|" /etc/zabbix/nginx.conf
-          sed -i "s|^\\s*#\\s*server_name\\s\\+example.com;|        server_name ${ServerName};|" /etc/zabbix/nginx.conf
-          rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default || true
-          if [[ -f /etc/nginx/conf.d/zabbix.conf ]]; then
-            sed -i 's|^\\s*#\\s*include\\s\\+/etc/zabbix/nginx\\.conf;|include /etc/zabbix/nginx.conf;|' /etc/nginx/conf.d/zabbix.conf
-          else
-            echo "include /etc/zabbix/nginx.conf;" > /etc/nginx/conf.d/zabbix.conf
-          fi
-          nginx -t
+            # Nginx/Zabbix site
+            sed -i "s|^\\s*#\\s*listen\\s\\+80;|        listen ${NginxPort};|" /etc/zabbix/nginx.conf
+            sed -i "s|^\\s*#\\s*server_name\\s\\+example.com;|        server_name ${ServerName};|" /etc/zabbix/nginx.conf
+            rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default || true
+            if [[ -f /etc/nginx/conf.d/zabbix.conf ]]; then
+              sed -i 's|^\\s*#\\s*include\\s\\+/etc/zabbix/nginx\\.conf;|include /etc/zabbix/nginx.conf;|' /etc/nginx/conf.d/zabbix.conf
+            else
+              echo "include /etc/zabbix/nginx.conf;" > /etc/nginx/conf.d/zabbix.conf
+            fi
+            nginx -t
 
-          systemctl restart zabbix-server zabbix-agent php8.1-fpm nginx
-          systemctl enable  zabbix-server zabbix-agent php8.1-fpm nginx
+            systemctl restart zabbix-server zabbix-agent php8.1-fpm nginx
+            systemctl enable  zabbix-server zabbix-agent php8.1-fpm nginx
 
-          # ---------- Grafana OSS (porta 3000) ----------
-          curl -fsSL https://packages.grafana.com/gpg.key | gpg --dearmor -o /usr/share/keyrings/grafana.gpg
-          echo "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://packages.grafana.com/oss/deb stable main" > /etc/apt/sources.list.d/grafana.list
-          apt-get update -y
-          apt-get install -y grafana
-          sed -i "s/^;admin_user = .*/admin_user = admin/" /etc/grafana/grafana.ini
-          if grep -q '^;admin_password = ' /etc/grafana/grafana.ini; then
-            sed -i "s/^;admin_password = .*/admin_password = ${GrafanaAdminPass}/" /etc/grafana/grafana.ini
-          elif grep -q '^admin_password = ' /etc/grafana/grafana.ini; then
-            sed -i "s/^admin_password = .*/admin_password = ${GrafanaAdminPass}/" /etc/grafana/grafana.ini
-          else
-            echo -e "\n[security]\nadmin_password = ${GrafanaAdminPass}" >> /etc/grafana/grafana.ini
-          fi
-          sed -i "s/^;http_port = .*/http_port = 3000/" /etc/grafana/grafana.ini
-          systemctl daemon-reload
-          systemctl enable grafana-server
-          systemctl restart grafana-server
+            # ---------- Grafana OSS (porta 3000) ----------
+            curl -fsSL https://packages.grafana.com/gpg.key | gpg --dearmor -o /usr/share/keyrings/grafana.gpg
+            echo "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://packages.grafana.com/oss/deb stable main" > /etc/apt/sources.list.d/grafana.list
+            apt-get update -y
+            apt-get install -y grafana
+            sed -i "s/^;admin_user = .*/admin_user = admin/" /etc/grafana/grafana.ini
+            if grep -q '^;admin_password = ' /etc/grafana/grafana.ini; then
+              sed -i "s/^;admin_password = .*/admin_password = ${GrafanaAdminPass}/" /etc/grafana/grafana.ini
+            elif grep -q '^admin_password = ' /etc/grafana/grafana.ini; then
+              sed -i "s/^admin_password = .*/admin_password = ${GrafanaAdminPass}/" /etc/grafana/grafana.ini
+            else
+              echo -e "\n[security]\nadmin_password = ${GrafanaAdminPass}" >> /etc/grafana/grafana.ini
+            fi
+            sed -i "s/^;http_port = .*/http_port = 3000/" /etc/grafana/grafana.ini
+            systemctl daemon-reload
+            systemctl enable grafana-server
+            systemctl restart grafana-server
 
-          # UFW (se presente)
-          if command -v ufw >/dev/null 2>&1; then
-            ufw allow ${NginxPort}/tcp || true
-            ufw allow 3000/tcp || true
-          fi
+            # UFW (se presente)
+            if command -v ufw >/dev/null 2>&1; then
+              ufw allow ${NginxPort}/tcp || true
+              ufw allow 3000/tcp || true
+            fi
 
-          # Info
-          PUB_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-          {
-            echo "ZABBIX OK!  -> http://$PUB_IP/"
-            echo "Grafana OK! -> http://$PUB_IP:3000 (user: admin / pass: ${GrafanaAdminPass})"
-            echo "DB: ${DbName} | user: ${DbUser}"
-          } > /root/info.txt
+            # Info
+            PUB_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+            {
+              echo "ZABBIX OK!  -> http://$PUB_IP/"
+              echo "Grafana OK! -> http://$PUB_IP:3000 (user: admin / pass: ${GrafanaAdminPass})"
+              echo "DB: ${DbName} | user: ${DbUser}"
+            } > /root/info.txt
 
 Outputs:
   VpcId:
