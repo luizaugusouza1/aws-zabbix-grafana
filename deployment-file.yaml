@@ -1,1 +1,1 @@
-template-file-path: ./templateec2.yaml
+template-file-path: ./aws-zabbix-grafana/templateec2.yaml
