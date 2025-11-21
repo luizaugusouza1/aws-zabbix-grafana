@@ -264,7 +264,7 @@ Resources:
             DeleteOnTermination: true
       Tags:
         - Key: Name
-          Value: instancia-Zabbix-Grafana
+          Value: Instancia-Zabbix-Grafana
       UserData: !Base64
         Fn::Sub: |
           #!/bin/bash
