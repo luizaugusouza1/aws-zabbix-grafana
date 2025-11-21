@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: us-east-1 | VPC + 2 públicas + 2 privadas + IGW + RTs + SG + EC2
-  (Ubuntu 22.04) Zabbix + Grafana
+Description: us-east-1 | VPC + 2 públicas + 2 privadas + IGW + RTs + SG + EC2 (Ubuntu 22.04) Zabbix + Grafana
 
 Parameters:
   VPCCidr:
@@ -21,10 +20,10 @@ Parameters:
 
   AmiId:
     Type: AWS::EC2::Image::Id
-    Default: ami-0bbdd8c17ed981ef9
+    Default: ami-0c5ddb3560e768732
   InstanceType:
     Type: String
-    Default: t2.small
+    Default: t3.large
     AllowedValues:
       - t2.small
       - t3.small
@@ -56,7 +55,7 @@ Parameters:
   RootDbPass:
     Type: String
     NoEcho: true
-    Default: EL@2025Br55
+    Default: LA@2025Br55
   NginxPort:
     Type: String
     Default: '80'
@@ -207,7 +206,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: !Ref IngressCidr
+          CidrIp: 189.18.217.85/32  # meu IP fixo
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -230,7 +229,22 @@ Resources:
           CidrIp: !Ref IngressCidr
       Tags:
         - Key: Name
-          Value: instancia-Zabbix-Grafana
+          Value: SG-zabbix-grafana
+
+  # Elastic IP (IP fixo) + Associação
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+    Tags:
+      - Key: Name
+        Value: eip-zabbix-grafana
+
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIP.AllocationId
+      InstanceId: !Ref Ec2Instance
 
   # EC2
   Ec2Instance:
@@ -353,7 +367,7 @@ Resources:
             ufw allow 3000/tcp || true
           fi
 
-          # Info (sem  de shell para não conflitar com Fn: :Sub)
+          # Info
           PUB_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
           {
             echo "ZABBIX OK!  -> http://$PUB_IP/"
@@ -395,3 +409,6 @@ Outputs:
   InstancePublicIp:
     Description: IP público da EC2
     Value: !GetAtt Ec2Instance.PublicIp
+  ElasticIpAddress:
+    Description: Elastic IP associado à instância
+    Value: !Ref ElasticIP
