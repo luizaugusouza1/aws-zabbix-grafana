@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: us-east-1 | VPC + 2 públicas + 2 privadas + IGW + RTs + SG + EC2 + EIP (Ubuntu 22.04)
+Description: us-east-1 | VPC + 2 públicas + 2 privadas + IGW + RTs + SG + EC2 (Ubuntu 22.04)
 
 Parameters:
   VPCCidr:
@@ -168,13 +168,25 @@ Resources:
   AppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: SSH
+      GroupDescription: SSH/HTTP/HTTPS
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
           CidrIp: 187.58.48.3/32
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref IngressCidr
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref IngressCidr
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: !Ref IngressCidr
       Tags:
         - Key: Name
           Value: sg-ec2
@@ -204,7 +216,7 @@ Resources:
       Domain: vpc
       Tags:
         - Key: Name
-          Value: eip-InstanceLinuxUbuntu22
+          Value: InstanceLinuxUbuntu22-EIP
 
   Ec2EipAssociation:
     Type: AWS::EC2::EIPAssociation
