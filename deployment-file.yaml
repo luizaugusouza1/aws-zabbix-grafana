@@ -1,1 +1,1 @@
-template-file-path: ./stack-zabbix-grafana.yaml
+template-file-path: ./aws-zabbix-grafana/stack-zabbix-grafana.yaml
